@@ -1,0 +1,44 @@
+# --- Build output ---
+build/
+out/
+bin/
+target/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.class
+*.log
+
+# --- Gradle ---
+.gradle/
+gradle-app.setting
+.gradletasknamecache
+
+# --- Maven ---
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# --- IDEs ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+*.swp
+*~
+
+# --- Test server (see BUILD.md) ---
+run/
+server/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini

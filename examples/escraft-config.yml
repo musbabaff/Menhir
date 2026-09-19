@@ -1,0 +1,181 @@
+# ============================================================================
+#  Example: a MineBlocks-era config (escraft.com.tr style), trimmed to 2 blocks.
+#
+#  This file uses ONLY the legacy MineBlocks keys — no `hologram-templates`,
+#  no `options.afk`, no `options.hologram`. It must load in Menhir without any
+#  edits; the console prints one "deprecated" hint per legacy option key.
+#  It is a compatibility smoke test: `cp examples/escraft-config.yml plugins/Menhir/config.yml`.
+#
+#  Things exercised on purpose:
+#   - `options.afk-integration-enabled` / `options.notification-type` (legacy AFK keys)
+#   - `options.hologram-update-interval` in ticks
+#   - `#ICON: %type%` line (DecentHolograms syntax) -> rendered as a rotating ItemDisplay
+#   - MiniMessage gradient + legacy `&l` + per-character hex "gradient" + ItemsAdder font placeholder
+#   - `tool.types` entry written as a plain string ('default: ALLOWED')
+#   - identical hologram on both blocks (what `hologram-templates` removes)
+# ============================================================================
+
+lang:
+  top:
+    nobody: "&7-"
+    nobody-breaks: "0"
+    not_ranked: "Sırasız"
+  timeout:
+    message: "&cYenilenme: &f%time%"
+    max-units: 2
+    units:
+      hour: " saat"
+      hours: " saat"
+      minute: " dakika"
+      minutes: " dakika"
+      second: " saniye"
+      seconds: " saniye"
+  status:
+    timeout: "&cBu taş şu anda kırılamaz!"
+    afk: "&cAFK iken taş kıramazsın!"
+    no-permission: "&cBu taşı kırma iznin yok!"
+    invalid-tool: "&cBu aletle bu taşı kıramazsın!"
+
+options:
+  afk-integration-enabled: true      # legacy -> options.afk.enabled
+  notification-type: ACTIONBAR       # legacy -> options.afk.notification-type
+  block-break-limit: 20
+  hologram-update-interval: -1       # legacy (ticks) -> options.hologram.update-interval (seconds)
+  offline-rewards: true
+
+blocks:
+  metin_1:
+    location:
+      world: "world"
+      x: 120
+      y: 71
+      z: -45
+    type: DEEPSLATE_BRICKS
+    health: 250
+    hologram:
+      offset:
+        x: 0
+        y: 1.2
+        z: 0
+      lines:
+        - '#ICON: %type%'
+        - '<gradient:#FF4500:#FFD700><b>METİN TAŞI</b></gradient>'
+        - '%img_general_icon_16% &#FF4500E&#FF5A00S&#FF7000C&#FF8600R&#FF9C00A&#FFB200F&#FFC800T'
+        - ''
+        - '&6&lEN ÇOK KIRANLAR'
+        - '&e#1 &f%player_1% &7- &e%player_1_breaks%'
+        - '&e#2 &f%player_2% &7- &e%player_2_breaks%'
+        - '&e#3 &f%player_3% &7- &e%player_3_breaks%'
+        - ''
+        - '&a%health%&7/&a%max_health% &7can'
+        - '&c%timeout%'
+    permission: ""
+    break-limit: 20
+    timeout:
+      time: 900
+      type: BEDROCK
+      respawn: "&a[Metin] &fMetin taşı yeniden doğdu!"
+    messages:
+      break:
+        - "&a[Metin] &fMetin taşı yıkıldı!"
+        - "&a[Metin] &fKırma sayın: &e%breaks%"
+    reset:
+      inactive:
+        time: -1
+        message: "&7Taş iyileşti, 5 dakikadır kimse kırmadı. %breaks% kırman silindi."
+      onrestart: false
+    tool:
+      types:
+        - 'default: ALLOWED'
+      enchantments:
+        default: ALLOWED
+      names:
+        default: ALLOWED
+    rewards:
+      birinci:
+        type: top
+        place: 1
+        mode: all
+        commands:
+          - "100;give %player% diamond 8"
+          - "100;eco give %player% 500"
+      ilk_uc:
+        type: top
+        place: 1-3
+        mode: all
+        commands:
+          - "100;give %player% emerald 4"
+      son_vuran:
+        type: break
+        condition: last
+        mode: all
+        commands:
+          - "100;give %player% netherite_scrap 1"
+
+  metin_2:
+    location:
+      world: "world"
+      x: -210
+      y: 68
+      z: 300
+    type: DEEPSLATE_BRICKS
+    health: 250
+    hologram:
+      offset:
+        x: 0
+        y: 1.2
+        z: 0
+      lines:
+        - '#ICON: %type%'
+        - '<gradient:#FF4500:#FFD700><b>METİN TAŞI</b></gradient>'
+        - '%img_general_icon_16% &#FF4500E&#FF5A00S&#FF7000C&#FF8600R&#FF9C00A&#FFB200F&#FFC800T'
+        - ''
+        - '&6&lEN ÇOK KIRANLAR'
+        - '&e#1 &f%player_1% &7- &e%player_1_breaks%'
+        - '&e#2 &f%player_2% &7- &e%player_2_breaks%'
+        - '&e#3 &f%player_3% &7- &e%player_3_breaks%'
+        - ''
+        - '&a%health%&7/&a%max_health% &7can'
+        - '&c%timeout%'
+    permission: ""
+    break-limit: 20
+    timeout:
+      time: 900
+      type: BEDROCK
+      respawn: "&a[Metin] &fMetin taşı yeniden doğdu!"
+    messages:
+      break:
+        - "&a[Metin] &fMetin taşı yıkıldı!"
+        - "&a[Metin] &fKırma sayın: &e%breaks%"
+    reset:
+      inactive:
+        time: -1
+        message: "&7Taş iyileşti, 5 dakikadır kimse kırmadı. %breaks% kırman silindi."
+      onrestart: false
+    tool:
+      types:
+        - 'default: ALLOWED'
+      enchantments:
+        default: ALLOWED
+      names:
+        default: ALLOWED
+    rewards:
+      birinci:
+        type: top
+        place: 1
+        mode: all
+        commands:
+          - "100;give %player% diamond 8"
+          - "100;eco give %player% 500"
+      ilk_uc:
+        type: top
+        place: 1-3
+        mode: all
+        commands:
+          - "100;give %player% emerald 4"
+      son_vuran:
+        type: break
+        condition: last
+        mode: all
+        commands:
+          - "100;give %player% netherite_scrap 1"

@@ -1,0 +1,96 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.0.0'
+    id 'net.minecrell.plugin-yml.bukkit' version '0.5.3'
+}
+
+group = 'com.musbabaff'
+version = '2.0.0'
+description = 'Breakable leaderboard stones with built-in holograms, AFK protection and PlaceholderAPI support.'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { name = 'papermc'; url = 'https://repo.papermc.io/repository/maven-public/' }
+    maven { name = 'placeholderapi'; url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
+    maven { name = 'aikar'; url = 'https://repo.aikar.co/content/groups/aikar/' }
+    maven { name = 'minebench'; url = 'https://repo.minebench.de/' }
+    maven { name = 'jitpack'; url = 'https://jitpack.io' }
+    maven { name = 'sonatype-snapshots'; url = 'https://oss.sonatype.org/content/repositories/snapshots' }
+}
+
+dependencies {
+    // Server API (provided at runtime by Paper)
+    compileOnly 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
+
+    // Optional integrations (soft dependencies)
+    compileOnly 'me.clip:placeholderapi:2.11.6'
+    compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
+
+    // Compile-time only
+    compileOnly 'org.projectlombok:lombok:1.18.36'
+    annotationProcessor 'org.projectlombok:lombok:1.18.36'
+
+    // Shaded libraries
+    implementation 'co.aikar:acf-bukkit:0.5.1-SNAPSHOT'
+    implementation 'de.themoep:minedown-adventure:1.7.1-SNAPSHOT'
+
+    // Tests
+    testImplementation 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked', '-parameters'])
+}
+
+shadowJar {
+    archiveFileName = "Menhir-${project.version}.jar"
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    relocate 'co.aikar.commands', 'com.musbabaff.menhir.libs.acf'
+    relocate 'co.aikar.locales', 'com.musbabaff.menhir.libs.acf.locales'
+    relocate 'de.themoep.minedown', 'com.musbabaff.menhir.libs.minedown'
+}
+
+// Only the shaded jar is useful on a server; the plain jar would collide with it on
+// case-insensitive file systems.
+jar {
+    enabled = false
+}
+
+build.dependsOn shadowJar
+
+bukkit {
+    name = 'Menhir'
+    main = 'com.musbabaff.menhir.MenhirPlugin'
+    version = project.version
+    author = 'musbabaff'
+    website = 'https://github.com/musbabaff/Menhir'
+    description = project.description
+    apiVersion = '1.21'
+    load = 'POSTWORLD'
+    depend = []
+    softDepend = ['PlaceholderAPI', 'Vault', 'ItemsAdder']
+    permissions {
+        'menhir.admin' {
+            description = 'Grants access to every Menhir command'
+            setDefault('OP')
+            children = [
+                'menhir.help', 'menhir.reload', 'menhir.list', 'menhir.teleport', 'menhir.version',
+                'menhir.reset', 'menhir.sethealth', 'menhir.edit', 'menhir.remove', 'menhir.create',
+                'menhir.hologram'
+            ]
+        }
+    }
+}

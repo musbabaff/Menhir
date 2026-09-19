@@ -1,0 +1,159 @@
+# ============================================================================
+#  Menhir — breakable leaderboard stones for Paper
+#  https://github.com/musbabaff/Menhir
+#
+#  Text formatting (works everywhere: hologram lines, messages, status texts):
+#    Legacy codes   &a &7 &l &m ...          Hex   &#RRGGBB   {#RRGGBB}   #RRGGBB
+#    MiniMessage    <gradient:#FF4500:#FFD700><b>text</b></gradient>   <#RRGGBB>text
+#    Gradients      <#FF4500>text</#FFD700>   (MineBlocks / IridiumColorAPI syntax)
+#    PlaceholderAPI placeholders (e.g. %img_general_icon_16% from ItemsAdder) are
+#    resolved on every hologram update when PlaceholderAPI is installed.
+# ============================================================================
+
+lang:
+  top:
+    nobody: "&cNobody"
+    nobody-breaks: "0"
+    not_ranked: "Not ranked"
+  timeout:
+    message: "%time%"
+    max-units: 2
+    units:
+      hour: " hour"
+      hours: " hours"
+      minute: " minute"
+      minutes: " minutes"
+      second: " second"
+      seconds: " seconds"
+  status:
+    timeout: "&cYou can't destroy the block now!"
+    afk: "&cYou are AFK!"
+    no-permission: "&cYou don't have permission to break this block!"
+    invalid-tool: "&cYou can't use this tool to break this block!"
+
+options:
+  # Built-in AFK protection. A player who has not moved (position change only,
+  # looking around does not count) for `seconds` cannot hit a block; the hit is
+  # ignored and lang.status.afk is shown (at most once every 2 seconds).
+  # Can be overridden per block with blocks.<id>.afk.{enabled, seconds, notification-type}.
+  afk:
+    enabled: true
+    seconds: 15
+    notification-type: ACTIONBAR # ACTIONBAR, CHAT, TITLE or NONE
+  # How the other status messages (timeout, no permission, invalid tool) are shown.
+  notification-type: ACTIONBAR # ACTIONBAR, CHAT, TITLE or NONE
+  # Global/default minimum time between two hits of the same player, in milliseconds.
+  block-break-limit: 20
+  # Rewards for players who are offline when a block is fully broken are stored
+  # and executed when they join.
+  offline-rewards: true
+  # Default hologram appearance. Every key can be overridden in a template or a block.
+  hologram:
+    scale: 1.0
+    billboard: CENTER # CENTER, VERTICAL, HORIZONTAL or FIXED
+    background: transparent # transparent, default, #RRGGBB or #AARRGGBB
+    text-shadow: false
+    see-through: false
+    alignment: CENTER # CENTER, LEFT or RIGHT
+    view-distance: 48 # blocks; holograms are not updated when nobody is within this range
+    update-interval: -1 # seconds between updates; -1 = every tick (text is only re-sent when it changed)
+    line-width: 1000 # pixels before the text wraps
+
+# Reusable hologram definitions. A block uses `hologram.template: <name>`; the
+# template named `default` is used automatically when a block names no template.
+# Keys set on the block itself override the template.
+hologram-templates:
+  default:
+    lines:
+      - '#ICON: %type%'
+      - '#2C74B3&lMENHIR'
+      - '#2C74B3&lᴛᴏᴘ'
+      - '&7%player_1% &8- #2C74B3%player_1_breaks%'
+      - '&7%player_2% &8- #2C74B3%player_2_breaks%'
+      - '&7%player_3% &8- #2C74B3%player_3_breaks%'
+      - '#2C74B3%health%/%max_health%'
+      - '&7Break to get reward'
+      - '&c%timeout%'
+
+blocks:
+  example:
+    location: # Location of the block
+      world: "world_name"
+      x: 0
+      y: 100
+      z: 0
+    type: GOLD_BLOCK # Material name, see https://jd.papermc.io/paper/1.21.4/org/bukkit/Material.html
+    health: 100
+    hologram:
+      template: default
+      offset:
+        x: 0
+        y: 0
+        z: 0
+      # lines: [...]   # give the block its own lines instead of the template's
+    permission: ""
+    break-limit: 20 # Block break limit in milliseconds (-1 = use options.block-break-limit)
+    # afk:            # per-block AFK override
+    #   seconds: 30
+    timeout:
+      time: 60 # Timeout in seconds
+      type: BEDROCK
+      respawn: "&7Block was respawned!"
+    messages:
+      break:
+        - "&7Block was destroyed"
+        - "&7Your breaks: %breaks%"
+    reset:
+      inactive: # When nobody mines the block for this amount of seconds, it will automatically reset
+        time: -1
+        message: "&7Block was healed, because nobody mined it for 5 minutes. You lost %breaks% breaks"
+      onrestart: true # block will automatically reset when the server or plugin are restarted
+    tool:
+      types: # "<material regex>: ALLOWED|DENIED"; a map form (STONE_.*: ALLOWED) is accepted too
+      - "default: DENIED"
+      - "STONE_.*: ALLOWED"
+      enchantments:
+        default: DENIED
+        unbreaking:
+          level: 4
+          type: ALLOWED
+        efficiency:
+          level: 4-5
+          type: ALLOWED
+      names:
+        "default": DENIED
+        "Test name": ALLOWED
+    rewards:
+      reward_name:
+        type: top
+        place: 1
+        commands:
+          - "10;give %player% diamond" # chance;command
+          - "100;give %player% iron_ingot"
+      reward1:
+        type: top
+        place: 1-3
+        commands:
+          - "10;give %player% diamond" # chance;command
+          - "100;give %player% iron_ingot"
+      reward2:
+        type: break
+        interval: 5 # every 5 breaks the player will receive reward
+        commands:
+          - "100;give %player% iron_nugget"
+      reward3:
+        type: break
+        condition: less than 5
+        commands:
+          - "100;give %player% iron_nugget"
+      reward4:
+        type: break
+        condition: last # player who breaks the block as last (before it has 0 health) will receive this reward
+        commands:
+          - "100;give %player% iron_nugget"
+      reward5:
+        type: break_count
+        from: 10
+        to: 50
+        commands:
+          - "100;give %player% iron_nugget"

@@ -1,0 +1,60 @@
+name: Bug report
+description: Something does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please fill in as much as you can;
+        the server log and your config are the two things that make bugs reproducible.
+  - type: input
+    id: version
+    attributes:
+      label: Menhir version
+      placeholder: "2.0.0 (see /menhir version)"
+    validations:
+      required: true
+  - type: input
+    id: server
+    attributes:
+      label: Server software and version
+      placeholder: "Paper 1.21.4 build 232"
+    validations:
+      required: true
+  - type: input
+    id: java
+    attributes:
+      label: Java version
+      placeholder: "Temurin 21.0.5"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Set `options.afk.seconds` to 5
+        2. Stand still for 10 seconds
+        3. Hit the block
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config.yml section
+      render: yaml
+  - type: textarea
+    id: log
+    attributes:
+      label: Server log / stack trace
+      render: text
+  - type: textarea
+    id: plugins
+    attributes:
+      label: Other plugins that may be involved
+      placeholder: "PlaceholderAPI 2.11.6, ItemsAdder 4.0, Vault 1.7.3"
