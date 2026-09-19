@@ -17,6 +17,8 @@ If none is installed, Gradle can provision one (`org.gradle.java.installations.a
 ./gradlew build          # compile, run tests, create the shaded jar
 ./gradlew test           # tests only
 ./gradlew shadowJar      # jar only
+./gradlew apiJavadoc     # Javadoc of the public API (strict doclint) -> build/docs/api
+./gradlew publishToMavenLocal   # install com.musbabaff:menhir into ~/.m2 for API consumers
 ```
 
 On Windows use `gradlew.bat` instead of `./gradlew`.
@@ -74,7 +76,12 @@ src/main/java/com/musbabaff/menhir/
   hologram/           TextDisplay/ItemDisplay engine (HologramManager, HologramEntity)
   text/               TextRenderer — MiniMessage + legacy/hex → Adventure components
   afk/                AfkTracker (pure logic) and AfkService (listener)
-  config/             config.yml parsing: lang, options, hologram settings/templates, afk, blocks
+  bossbar/            health boss bar shown while hitting
+  countdown/          respawn countdown announcements (CountdownSchedule is pure logic)
+  storage/            StorageProvider, MemoryStore, yaml/ and mysql/ backends, migration
+  api/                public API: MenhirAPI, MenhirStone, TopEntry, event/*
+  impl/               API implementation and the EventBridge that fires the events
+  config/             config.yml parsing: lang, options, hologram, afk, bossbar, countdown, storage, blocks
   integration/        PlaceholderAPI hook + expansion, Vault prefix provider
   commands/           /menhir (ACF)
   gui/, menu/         in-game editor

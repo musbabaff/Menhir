@@ -59,6 +59,11 @@ public final class AfkService implements Listener {
         return tracker.isAfk(player.getUniqueId(), settings.getThresholdMillis(), System.currentTimeMillis());
     }
 
+    /** Milliseconds since the player last changed position. */
+    public long getIdleMillis(Player player) {
+        return tracker.getIdleMillis(player.getUniqueId(), System.currentTimeMillis());
+    }
+
     /**
      * Sends the AFK warning unless one was sent to this player within the last two seconds.
      */

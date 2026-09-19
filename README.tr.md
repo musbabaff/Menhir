@@ -45,6 +45,13 @@ yapılmadan çalışmaya devam eder.
 * **PlaceholderAPI genişletmesi** `menhir` — can, yüzde, durum, sayaç, taş başına ve genel sıralamalar,
   bakan oyuncunun kendi vuruşu ve sırası, en yakın yeniden doğma.
 * **Hologram şablonları** — hologramı bir kez tanımlayın, her taşta kullanın.
+* **Boss bar** — taşa vuran (veya yakınında duran) herkese canlı can çubuğu; renk cana göre değişir,
+  taş kırılınca "yok edildi" başlığı; değişiklik yokken paket gönderilmez.
+* **Yeniden doğma geri sayımı** — "5 dakika / 1 dakika / 10 saniye kaldı" sohbet, başlık ve ses
+  duyuruları; yeniden doğma gece 4'te kimsenin görmediği bir sürpriz değil, bir etkinlik olsun.
+* **YAML veya MySQL depolama** — varsayılan dosya depolama; MySQL/MariaDB ile toplu arka plan
+  yazımı, yeniden bağlanma ve `server-id` sütunu sayesinde birden fazla sunucu tek liderlik tablosunu paylaşabilir.
+* **Geliştirici API'si** — diğer eklentiler için `MenhirAPI`, `MenhirStone` ve iptal edilebilir Bukkit olayları.
 * **Oyun içi düzenleyici** — `/menhir edit <taş>` konum, tür, can, hologram, bekleme süresi, ödüller,
   alet filtreleri ve sıfırlama seçenekleri için bir arayüz açar.
 
@@ -96,7 +103,72 @@ kısa bir örnek: [`examples/escraft-config.yml`](examples/escraft-config.yml).
 | `block-break-limit` | Bir oyuncunun iki vuruşu arasındaki en az milisaniye (taş başına `break-limit` geçersiz kılar) | `20` |
 | `offline-rewards` | Çevrimdışı oyuncuların ödüllerini sakla ve girişte çalıştır | `true` |
 | `hologram.*` | Genel hologram varsayılanları, aşağıya bakın | |
+| `bossbar.*` | Vururken gösterilen boss bar, aşağıya bakın | |
+| `respawn-countdown.*` | Yeniden doğma öncesi duyurular, aşağıya bakın | |
 | `afk-integration-enabled`, `hologram-update-interval` | **Eski** MineBlocks anahtarları — hâlâ okunur, konsola bir kez uyarı yazılır | |
+
+### Boss bar (`options.bossbar`, `blocks.<id>.bossbar`)
+
+| Anahtar | Açıklama | Varsayılan |
+|---|---|---|
+| `enabled` | Taşa vurulunca boss bar göster | `true` |
+| `show-to` | `HITTER` (yalnızca vuran), `RADIUS` (`radius` içindeki herkes), `WORLD` | `RADIUS` |
+| `radius` | Blok, `RADIUS` için | `32` |
+| `hide-after` | Son vuruştan kaç saniye sonra çubuk kaybolur | `8` |
+| `update-interval` | Tick; çubuk en fazla bu sıklıkta ve yalnızca bir şey değiştiğinde yeniden çizilir | `5` |
+| `max-bars-per-player` | Bir oyuncunun aynı anda görebileceği çubuk sayısı; en son vurulan taş kazanır | `1` |
+| `color` | `PINK`, `BLUE`, `RED`, `GREEN`, `YELLOW`, `PURPLE`, `WHITE` — eşik eşleşmeyince kullanılır | `RED` |
+| `style` | `PROGRESS`, `NOTCHED_6`, `NOTCHED_10`, `NOTCHED_12`, `NOTCHED_20` | `NOTCHED_20` |
+| `color-thresholds` | `{above: <yüzde>, color: <renk>}` listesi; canın üstünde olduğu ilk girdi kazanır. `[]` = her zaman `color` | 66 yeşil / 33 sarı / 0 kırmızı |
+| `title` | Çubuk metni. Yer tutucular: `%block_name%`, `%block_id%`, `%health%`, `%max_health%`, `%percent%`, `%player_1%`, `%player_1_breaks%`, `%my_breaks%`, `%my_rank%`, PlaceholderAPI | config'e bakın |
+| `broken-title` | Taş kırılınca gösterilen metin | config'e bakın |
+| `broken-linger` | Kırıldı başlığının kaç saniye kaldığı; `0` = hemen gizle | `3` |
+
+Oyuncu çıkınca, dünya değiştirince veya `/menhir reload` ile çubuklar kaldırılır.
+
+### Yeniden doğma geri sayımı (`options.respawn-countdown`, `blocks.<id>.respawn-countdown`)
+
+| Anahtar | Açıklama | Varsayılan |
+|---|---|---|
+| `enabled` | Kırık taş doğmadan önce duyuru yap | `true` |
+| `broadcast-to` | `SERVER`, `WORLD` (taşın dünyası) veya `RADIUS` | `WORLD` |
+| `radius` | Blok, `RADIUS` için | `100` |
+| `warn-at` | Doğmadan kaç saniye önce duyurulacağı (sıra önemsiz) | `[300, 60, 10]` |
+| `title.enabled` | Başlık da göster | `true` |
+| `title.only-last` | Başlık yalnızca en küçük eşikte | `true` |
+| `title.fade-in`, `title.stay`, `title.fade-out` | Tick | `10`, `40`, `10` |
+| `sound` | Ses adı (`BLOCK_NOTE_BLOCK_PLING`) veya anahtarı (`minecraft:block.note_block.pling`); boş = ses yok | `BLOCK_NOTE_BLOCK_PLING` |
+
+Metinler `lang.countdown.{chat,title,subtitle}` altındadır; `%time%` (`lang.timeout.units` ile biçimlenir),
+`%block_name%` ve `%block_id%` kullanılabilir. Doğma anında normal `timeout.respawn` mesajı yine gönderilir.
+Sunucu kapalıyken geçen eşikler sonradan duyurulmaz; her eşik bir bekleme süresinde bir kez duyurulur.
+
+### Depolama (`storage`)
+
+| Anahtar | Açıklama | Varsayılan |
+|---|---|---|
+| `type` | `YAML` (taş başına `storage/<id>.yml`) veya `MYSQL` | `YAML` |
+| `server-id` | Her MySQL satırına yazılır; her sunucuda farklı bir id kullanın | `survival` |
+| `cross-server-leaderboard` | `%player_<n>%` / top yer tutucularında tüm sunucuların satırlarını birleştir (MySQL) | `false` |
+| `flush-interval` | Arka plan yazımları arası saniye (iki arka uç için de) | `30` |
+| `mysql.host`, `port`, `database`, `username`, `password` | Bağlantı | `127.0.0.1`, `3306`, `menhir` |
+| `mysql.table-prefix` | `breaks`, `state` ve `meta` tablolarının ön eki | `menhir_` |
+| `mysql.use-ssl` | TLS zorunlu | `false` |
+| `mysql.pool-size` | Açık tutulan bağlantı sayısı | `6` |
+| `mysql.connection-timeout` | Milisaniye | `5000` |
+| `mysql.reconnect-interval` | Veritabanı kapalıyken yeniden bağlanma denemeleri arası saniye | `60` |
+
+Vuruşlar tur bazında sayılır (taş kırılınca sıfırlanır), tıpkı bellekteki modelde olduğu gibi. MineBlocks /
+Menhir 2.0'ın eski `storage/<id>.mb` dosyaları otomatik içe aktarılır. Tablolar ilk açılışta oluşturulur
+(`CREATE TABLE IF NOT EXISTS`); Paper ile gelen JDBC sürücüsü kullanılır, ek kütüphane gerekmez.
+Veritabanına ulaşılamazsa eklenti bellekten çalışmaya devam eder, bir hata satırı yazar, her
+`reconnect-interval` saniyede yeniden dener ve kapanışta yazılamayan değişiklikleri
+`storage/mysql-pending.yml` içinde saklar.
+
+Arka uç değiştirmek: `storage.type` değerini ayarlayın, `/menhir migrate yaml-to-mysql` (veya
+`mysql-to-yaml`) çalıştırın, sonra `/menhir reload`. Taşıma önce kaynağı
+`storage/storage-backup-<zaman>.yml` dosyasına yedekler ve `--overwrite` verilmedikçe hedefte var olan
+satırları atlar.
 
 ### Hologram ayarları (`options.hologram`, `hologram-templates.<ad>`, `blocks.<id>.hologram`)
 
@@ -160,11 +232,14 @@ blocks:
 |---|---|
 | `location.{world,x,y,z}` | Blok konumu |
 | `type` | Taşın materyali (`GOLD_BLOCK`, `DEEPSLATE_BRICKS`, …) |
+| `display-name` | `%block_name%` için ad (renk kodları kullanılabilir); varsayılan id'dir |
 | `health` | Kırmak için gereken vuruş sayısı |
 | `permission` | Vurmak için gereken izin (`""` = yok) |
 | `break-limit` | Bir oyuncunun iki vuruşu arası milisaniye; `-1` = `options.block-break-limit` |
 | `hologram.*` | Yukarıya bakın |
 | `afk.{enabled,seconds,notification-type}` | Taş başına AFK ayarı (isteğe bağlı) |
+| `bossbar.*` | Taş başına boss bar ayarı (isteğe bağlı, `options.bossbar` ile aynı anahtarlar) |
+| `respawn-countdown.*` | Taş başına geri sayım ayarı (isteğe bağlı, `options.respawn-countdown` ile aynı anahtarlar) |
 | `timeout.time` | Kırıldıktan sonraki bekleme süresi, saniye (`-1` = yok) |
 | `timeout.type` | Bekleme süresinde gösterilen materyal (ör. `BEDROCK`) |
 | `timeout.respawn` | Taş geri geldiğinde yayınlanan mesaj (metin veya liste) |
@@ -214,6 +289,8 @@ Komutlar konsol tarafından çalıştırılır. Komut ve mesajlardaki yer tutucu
 | Yer tutucu | Değer |
 |---|---|
 | `%health%` / `%max_health%` | Mevcut / en yüksek can |
+| `%percent%` | Yüzde olarak can (0–100) |
+| `%block_name%` / `%block_id%` | Taşın görünen adı / id'si |
 | `%type%` | Taşın materyal adı |
 | `%timeout%` | Biçimlendirilmiş kalan bekleme süresi; taş sağlamken boştur (ve satır gizlenir) |
 | `%player_1%` … `%player_10%` | *n*. oyuncunun adı (veya `lang.top.nobody`) |
@@ -255,6 +332,8 @@ Ana komut: `/menhir` (takma adlar `/metin`, `/menhirstone`, `/mb`).
 | `/menhir remove <id>` | Taşı sil (yalnızca konsol; oyunda düzenleyiciyi kullan) | `menhir.remove` |
 | `/menhir teleport <id>` | Taşa ışınlan | `menhir.teleport` |
 | `/menhir reset <id>` | Can ve sayaçları sıfırla | `menhir.reset` |
+| `/menhir respawn <id\|all>` | Kırık taşı (veya hepsini) hemen yeniden doğur | `menhir.admin` |
+| `/menhir migrate <yaml-to-mysql\|mysql-to-yaml> [--overwrite]` | Depolanan verileri arka uçlar arasında kopyala | `menhir.admin` |
 | `/menhir sethealth <id> <n>` | Mevcut canı ayarla | `menhir.sethealth` |
 | `/menhir hologram show <id>` | Hologram satırlarını düzenleme bağlantılarıyla göster | `menhir.hologram` |
 | `/menhir hologram addline <id> <metin>` | Satır ekle | `menhir.hologram` |
@@ -264,6 +343,90 @@ Ana komut: `/menhir` (takma adlar `/metin`, `/menhirstone`, `/mb`).
 | `/menhir wiki` | Bu sayfanın bağlantısı | — |
 
 Her alt komut için `menhir.admin` (varsayılan: OP) gerekir; bu izin tüm `menhir.*` izinlerini içerir.
+
+## Geliştirici API'si
+
+Menhir, diğer eklentiler ve betikler için küçük bir API sunar. API eklenti jar'ının içindedir; GitHub
+Packages'tan compile-only bağımlılık olarak ekleyin (veya jar'ı yerel bir depoya koyun):
+
+```groovy
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/musbabaff/Menhir")
+        credentials {
+            username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+dependencies {
+    compileOnly "com.musbabaff:menhir:2.1.0"
+}
+```
+
+Maven:
+
+```xml
+<dependency>
+    <groupId>com.musbabaff</groupId>
+    <artifactId>menhir</artifactId>
+    <version>2.1.0</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+Menhir'in önce yüklenmesi için `plugin.yml` dosyanıza ekleyin:
+
+```yaml
+softdepend: [Menhir]
+```
+
+Bir olayı dinleyip API'yi çağırmak:
+
+```java
+import com.musbabaff.menhir.api.MenhirAPI;
+import com.musbabaff.menhir.api.MenhirProvider;
+import com.musbabaff.menhir.api.TopEntry;
+import com.musbabaff.menhir.api.event.MenhirBreakEvent;
+import com.musbabaff.menhir.api.event.MenhirDamageEvent;
+
+public final class MyListener implements Listener {
+
+    @EventHandler
+    public void onDamage(MenhirDamageEvent event) {
+        // Elmas kazma iki kat vursun; yaratıcı moddakiler hiç vuramasın.
+        if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
+            event.setCancelled(true);
+        } else if (event.getPlayer().getInventory().getItemInMainHand().getType() == Material.DIAMOND_PICKAXE) {
+            event.setDamage(2);
+        }
+    }
+
+    @EventHandler
+    public void onBreak(MenhirBreakEvent event) {
+        MenhirAPI api = MenhirProvider.get();
+        List<TopEntry> top = api.getTop(event.getStone().getId(), 3);
+        getLogger().info(event.getStone().getDisplayName() + " yıkıldı; ilk 3: " + top);
+        api.getRespawnAt(event.getStone().getId())
+           .ifPresent(at -> getLogger().info("yeniden doğma: " + at));
+    }
+}
+```
+
+Alternatif olarak API'yi servis yöneticisinden alın:
+`Bukkit.getServicesManager().load(MenhirAPI.class)`.
+
+| Olay | İptal edilebilir | Ne zaman |
+|---|---|---|
+| `MenhirDamageEvent` | evet (ve `setDamage`) | bir oyuncu taşa vurmak üzere |
+| `MenhirAfkBlockedEvent` | evet | oyuncu AFK olduğu için vuruş yok sayılmak üzere |
+| `MenhirBreakEvent` | hayır | taşın canı sıfıra indi (ödüllerden ve sıfırlamadan önce) |
+| `MenhirRewardEvent` | evet (komutlar değiştirilebilir) | bir oyuncuya ödül verilmek üzere |
+| `MenhirRespawnEvent` | hayır | taş geri geldi (`isScheduled()`: zamanlayıcı mı, komut/API mi) |
+| `MenhirRespawnCountdownEvent` | hayır | bir geri sayım uyarısı duyuruluyor |
+
+`com.musbabaff.menhir.api` altındaki her şey anlamsal sürümlemeye tabidir; diğer paketler dahilidir.
+Javadoc: `./gradlew apiJavadoc` → `build/docs/api`.
 
 ## MineBlocks'tan geçiş
 
@@ -281,7 +444,7 @@ Her alt komut için `menhir.admin` (varsayılan: OP) gerekir; bu izin tüm `menh
   (`mb.admin` → `menhir.admin`).
 * PlaceholderAPI tanımlayıcısı değişti: `%mb_…%` → `%menhir_…%` (eski parametre adları da çalışır).
 * Oyuncu ön ekleri artık Vault'tan gelir: `%player_<n>_prefix%` kullanıyorsanız Vault kurun.
-* Taş verileri (`storage/<id>.mb`) aynı biçimdedir; hiçbir şey kaybolmaz.
+* Taş verileri (`storage/<id>.mb`) ilk açılışta `storage/<id>.yml` dosyasına aktarılır; hiçbir şey kaybolmaz.
 * Paper 1.21.4 ve Java 21 gerekir — Spigot ve eski sürümler desteklenmez.
 
 ## SSS

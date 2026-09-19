@@ -30,6 +30,12 @@ lang:
     afk: "&cYou are AFK!"
     no-permission: "&cYou don't have permission to break this block!"
     invalid-tool: "&cYou can't use this tool to break this block!"
+  # Respawn countdown announcements (see options.respawn-countdown).
+  # %time% is formatted with the units above; %block_name% / %block_id% are available.
+  countdown:
+    chat: '&8» &e&l%block_name% &7yeniden doğmasına &e&l%time% &7kaldı!'
+    title: '&e&l%time%'
+    subtitle: '&7%block_name% yeniden doğuyor'
 
 options:
   # Built-in AFK protection. A player who has not moved (position change only,
@@ -47,6 +53,41 @@ options:
   # Rewards for players who are offline when a block is fully broken are stored
   # and executed when they join.
   offline-rewards: true
+  # Health boss bar shown while a stone is being hit. Every key can be overridden
+  # per block under blocks.<id>.bossbar.
+  bossbar:
+    enabled: true
+    show-to: RADIUS            # HITTER = only the hitter, RADIUS = everyone within `radius`, WORLD = the whole world
+    radius: 32
+    hide-after: 8              # seconds after the last hit until the bar disappears
+    update-interval: 5         # ticks; the bar is re-rendered at most this often and only when something changed
+    max-bars-per-player: 1     # the most recently hit stone wins
+    color: RED                 # PINK, BLUE, RED, GREEN, YELLOW, PURPLE, WHITE
+    style: NOTCHED_20          # PROGRESS, NOTCHED_6, NOTCHED_10, NOTCHED_12, NOTCHED_20
+    # Colour by health percentage (first matching "above" wins); leave empty ([]) to always use `color`.
+    color-thresholds:
+      - { above: 66, color: GREEN }
+      - { above: 33, color: YELLOW }
+      - { above: 0,  color: RED }
+    # Placeholders: %block_name% %block_id% %health% %max_health% %percent%
+    #               %player_1% %player_1_breaks% %my_breaks% %my_rank% + PlaceholderAPI
+    title: '&6&l%block_name% &8| &f%health%&7/&f%max_health% &8(&e%percent%%&8)'
+    broken-title: '&c&l%block_name% &8| &7Yok edildi!'
+    broken-linger: 3           # seconds the broken title stays; 0 = hide immediately
+  # Announcements before a broken stone respawns. Override per block under
+  # blocks.<id>.respawn-countdown. Texts are in lang.countdown.
+  respawn-countdown:
+    enabled: true
+    broadcast-to: WORLD        # SERVER, WORLD or RADIUS
+    radius: 100                # only for RADIUS
+    warn-at: [300, 60, 10]     # seconds before the respawn
+    title:
+      enabled: true
+      only-last: true          # show the title only for the smallest threshold
+      fade-in: 10              # ticks
+      stay: 40
+      fade-out: 10
+    sound: BLOCK_NOTE_BLOCK_PLING   # sound name or key; empty = no sound
   # Default hologram appearance. Every key can be overridden in a template or a block.
   hologram:
     scale: 1.0
@@ -58,6 +99,26 @@ options:
     view-distance: 48 # blocks; holograms are not updated when nobody is within this range
     update-interval: -1 # seconds between updates; -1 = every tick (text is only re-sent when it changed)
     line-width: 1000 # pixels before the text wraps
+
+# Where hit counts and stone states are stored.
+#   YAML  - plugins/Menhir/storage/<id>.yml (default; legacy .mb files are imported automatically)
+#   MYSQL - shared MySQL/MariaDB tables, e.g. for several servers with one leaderboard
+storage:
+  type: YAML                   # YAML | MYSQL
+  server-id: survival          # written to the `server` column; use a different id per server
+  cross-server-leaderboard: false   # true = leaderboards combine every server-id (MySQL only)
+  flush-interval: 30           # seconds between background writes (also applies to YAML)
+  mysql:
+    host: 127.0.0.1
+    port: 3306
+    database: menhir
+    username: ''
+    password: ''
+    table-prefix: 'menhir_'
+    use-ssl: false
+    pool-size: 6
+    connection-timeout: 5000   # milliseconds
+    reconnect-interval: 60     # seconds between reconnect attempts while the database is down
 
 # Reusable hologram definitions. A block uses `hologram.template: <name>`; the
 # template named `default` is used automatically when a block names no template.
@@ -83,6 +144,7 @@ blocks:
       y: 100
       z: 0
     type: GOLD_BLOCK # Material name, see https://jd.papermc.io/paper/1.21.4/org/bukkit/Material.html
+    display-name: '&6Example Stone' # used by %block_name%; defaults to the id
     health: 100
     hologram:
       template: default
@@ -95,6 +157,10 @@ blocks:
     break-limit: 20 # Block break limit in milliseconds (-1 = use options.block-break-limit)
     # afk:            # per-block AFK override
     #   seconds: 30
+    # bossbar:        # per-block boss bar override (same keys as options.bossbar)
+    #   show-to: WORLD
+    # respawn-countdown:   # per-block countdown override (same keys as options.respawn-countdown)
+    #   warn-at: [600, 60]
     timeout:
       time: 60 # Timeout in seconds
       type: BEDROCK

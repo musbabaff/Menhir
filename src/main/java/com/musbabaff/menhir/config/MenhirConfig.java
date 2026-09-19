@@ -12,6 +12,7 @@ import com.musbabaff.menhir.config.blocks.BlocksConfig;
 import com.musbabaff.menhir.config.hologram.HologramTemplates;
 import com.musbabaff.menhir.config.lang.LangConfig;
 import com.musbabaff.menhir.config.options.OptionsConfig;
+import com.musbabaff.menhir.config.storage.StorageSettings;
 import lombok.Getter;
 import org.bukkit.configuration.ConfigurationSection;
 
@@ -27,6 +28,7 @@ public class MenhirConfig {
     private final OptionsConfig optionsConfig;
     private final HologramTemplates hologramTemplates;
     private final BlocksConfig blocksConfig;
+    private final StorageSettings storageSettings;
 
     public MenhirConfig(ConfigurationSection config, Logger logger) {
         this.langConfig = new LangConfig(config.getConfigurationSection("lang"));
@@ -35,6 +37,7 @@ public class MenhirConfig {
         ConfigurationSection blocks = config.getConfigurationSection("blocks");
         if (blocks == null) blocks = config.createSection("blocks");
         this.blocksConfig = new BlocksConfig(blocks, optionsConfig, hologramTemplates);
+        this.storageSettings = new StorageSettings(config.getConfigurationSection("storage"));
     }
 
 }

@@ -61,6 +61,23 @@ public class LangConfig {
         return config.getString("status.invalid-tool", "You can't use this tool to break this block!");
     }
 
+    public String getCountdownChat() {
+        return config.getString("countdown.chat", "&8» &e&l%block_name% &7yeniden doğmasına &e&l%time% &7kaldı!");
+    }
+
+    public String getCountdownTitle() {
+        return config.getString("countdown.title", "&e&l%time%");
+    }
+
+    public String getCountdownSubtitle() {
+        return config.getString("countdown.subtitle", "&7%block_name% yeniden doğuyor");
+    }
+
+    /** Formats a duration of whole seconds with the configured units only, e.g. {@code 5 minutes}. */
+    public String formatDuration(int seconds) {
+        return formatUnits(seconds * 1000L);
+    }
+
     public String getTimeoutFormat() {
         return config.getString("timeout.message", "%time%");
     }
@@ -74,24 +91,36 @@ public class LangConfig {
      * limited to {@code timeout.max-units} units, and inserts it into {@code timeout.message}.
      */
     public String getTimeoutFormatted(long endMillis, long now) {
+        if (config.getConfigurationSection("timeout.units") == null) return "Invalid timeout configuration";
+        return getTimeoutFormat().replace("%time%", formatUnits(endMillis - now + 1000));
+    }
+
+    /**
+     * Splits {@code relativeMillis} into hours / minutes / seconds using the configured unit names,
+     * keeping at most {@code timeout.max-units} units.
+     */
+    public String formatUnits(long relativeMillis) {
         ConfigurationSection unitSection = config.getConfigurationSection("timeout.units");
-        if (unitSection == null) return "Invalid timeout configuration";
         List<String> units = new LinkedList<>();
-        long relative = endMillis - now + 1000;
+        long relative = relativeMillis;
         long hours = relative / HOUR_MS;
         relative -= hours * HOUR_MS;
         if (hours > 0)
-            units.add(hours <= 1 ? (hours + unitSection.getString("hour", "hour")) : (hours + unitSection.getString("hours", "hours")));
+            units.add(hours <= 1 ? (hours + unit(unitSection, "hour")) : (hours + unit(unitSection, "hours")));
         long minutes = relative / MINUTE_MS;
         relative -= minutes * MINUTE_MS;
         if (minutes > 0)
-            units.add(minutes <= 1 ? (minutes + unitSection.getString("minute", "minute")) : (minutes + unitSection.getString("minutes", "minutes")));
+            units.add(minutes <= 1 ? (minutes + unit(unitSection, "minute")) : (minutes + unit(unitSection, "minutes")));
         long seconds = relative / SECOND_MS;
         if (seconds > 0)
-            units.add(seconds <= 1 ? (seconds + unitSection.getString("second", "second")) : (seconds + unitSection.getString("seconds", "seconds")));
-        return getTimeoutFormat().replace("%time%", String.join(" ", units.stream()
+            units.add(seconds <= 1 ? (seconds + unit(unitSection, "second")) : (seconds + unit(unitSection, "seconds")));
+        return String.join(" ", units.stream()
                 .limit(config.getInt("timeout.max-units", 2))
-                .toArray(String[]::new)));
+                .toArray(String[]::new));
+    }
+
+    private static String unit(ConfigurationSection section, String key) {
+        return section == null ? " " + key : section.getString(key, " " + key);
     }
 
 }

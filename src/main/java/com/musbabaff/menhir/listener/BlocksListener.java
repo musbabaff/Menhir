@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -84,7 +85,8 @@ public class BlocksListener implements Listener {
         }
 
         AfkSettings afk = block.getAfkSettings();
-        if (plugin.getAfkService().isAfk(player, afk)) {
+        if (plugin.getAfkService().isAfk(player, afk)
+                && plugin.getEvents().afkBlocked(block, player, plugin.getAfkService().getIdleMillis(player))) {
             // The hit is ignored; the warning is rate-limited by the AFK service.
             plugin.getAfkService().warn(player, afk);
             player.playSound(e.getBlock().getLocation(), Sound.BLOCK_ANVIL_LAND, 100, 100);
@@ -101,7 +103,10 @@ public class BlocksListener implements Listener {
             return;
         }
 
-        block.onBreak(e.getPlayer()).run();
+        OptionalInt damage = plugin.getEvents().damage(block, player, 1);
+        if (damage.isEmpty()) return; // cancelled by a listener
+        block.onBreak(player, damage.getAsInt()).run();
+        plugin.getBossBarService().onHit(block, player);
     }
 
     private void deny(Player player, BlockBreakEvent e, String statusMessage, NotificationType type) {

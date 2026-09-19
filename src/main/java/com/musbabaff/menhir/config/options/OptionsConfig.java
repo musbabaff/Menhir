@@ -9,6 +9,8 @@
 package com.musbabaff.menhir.config.options;
 
 import com.musbabaff.menhir.config.afk.AfkSettings;
+import com.musbabaff.menhir.config.bossbar.BossBarSettings;
+import com.musbabaff.menhir.config.countdown.CountdownSettings;
 import com.musbabaff.menhir.config.hologram.HologramSettings;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.MemoryConfiguration;
@@ -38,11 +40,15 @@ public class OptionsConfig {
     private final AfkSettings afkSettings;
     private final HologramSettings hologramDefaults;
     private final NotificationType statusNotificationType;
+    private final BossBarSettings bossBarSettings;
+    private final CountdownSettings countdownSettings;
 
     public OptionsConfig(ConfigurationSection config, Logger logger) {
         this.config = config != null ? config : new MemoryConfiguration();
         this.afkSettings = readAfk(logger);
         this.hologramDefaults = readHologram(logger);
+        this.bossBarSettings = BossBarSettings.BUILT_IN.merge(BossBarSettings.parse(this.config.getConfigurationSection("bossbar")));
+        this.countdownSettings = CountdownSettings.BUILT_IN.merge(CountdownSettings.parse(this.config.getConfigurationSection("respawn-countdown")));
         this.statusNotificationType = Optional.ofNullable(this.config.getString("notification-type"))
                 .flatMap(NotificationType::getByName)
                 .orElse(NotificationType.ACTIONBAR);
@@ -87,6 +93,16 @@ public class OptionsConfig {
     /** Global AFK settings (already merged with built-in defaults). */
     public AfkSettings getAfkSettings() {
         return afkSettings;
+    }
+
+    /** Global respawn countdown settings (already merged with built-in defaults). */
+    public CountdownSettings getCountdownSettings() {
+        return countdownSettings;
+    }
+
+    /** Global boss bar settings (already merged with built-in defaults). */
+    public BossBarSettings getBossBarSettings() {
+        return bossBarSettings;
     }
 
     /** Global hologram defaults (already merged with built-in defaults). */

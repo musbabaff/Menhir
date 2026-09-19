@@ -2,16 +2,18 @@ plugins {
     id 'java'
     id 'com.gradleup.shadow' version '9.0.0'
     id 'net.minecrell.plugin-yml.bukkit' version '0.5.3'
+    id 'maven-publish'
 }
 
 group = 'com.musbabaff'
-version = '2.0.0'
+version = '2.1.0'
 description = 'Breakable leaderboard stones with built-in holograms, AFK protection and PlaceholderAPI support.'
 
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+    withSourcesJar()
 }
 
 repositories {
@@ -48,6 +50,7 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    maxHeapSize = '512m'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -57,6 +60,7 @@ tasks.withType(JavaCompile).configureEach {
 
 shadowJar {
     archiveFileName = "Menhir-${project.version}.jar"
+    archiveClassifier = ''
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     relocate 'co.aikar.commands', 'com.musbabaff.menhir.libs.acf'
     relocate 'co.aikar.locales', 'com.musbabaff.menhir.libs.acf.locales'
@@ -70,6 +74,65 @@ jar {
 }
 
 build.dependsOn shadowJar
+
+// Javadoc of the public API only (com.musbabaff.menhir.api.*), with strict doclint.
+tasks.register('apiJavadoc', Javadoc) {
+    source = sourceSets.main.allJava.matching { include 'com/musbabaff/menhir/api/**' }
+    classpath = sourceSets.main.compileClasspath
+    destinationDir = layout.buildDirectory.dir('docs/api').get().asFile
+    options.encoding = 'UTF-8'
+    options.addBooleanOption('Xdoclint:all', true)
+    options.addStringOption('Xwerror', '-quiet')
+    title = "Menhir API ${project.version}"
+    maxMemory = '256m'
+}
+
+check.dependsOn apiJavadoc
+
+// Developer API: the plugin jar (API classes included) is published as com.musbabaff:menhir.
+// Credentials come from the environment only (GitHub Actions sets both on release).
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = 'com.musbabaff'
+            artifactId = 'menhir'
+            version = project.version
+            artifact shadowJar
+            artifact sourcesJar
+            pom {
+                name = 'Menhir'
+                description = project.description
+                url = 'https://github.com/musbabaff/Menhir'
+                licenses {
+                    license {
+                        name = 'Mozilla Public License 2.0'
+                        url = 'https://www.mozilla.org/en-US/MPL/2.0/'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'musbabaff'
+                        name = 'Mustafa Babayev'
+                    }
+                }
+                scm {
+                    url = 'https://github.com/musbabaff/Menhir'
+                    connection = 'scm:git:https://github.com/musbabaff/Menhir.git'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'GitHubPackages'
+            url = uri('https://maven.pkg.github.com/musbabaff/Menhir')
+            credentials {
+                username = System.getenv('GITHUB_ACTOR')
+                password = System.getenv('GITHUB_TOKEN')
+            }
+        }
+    }
+}
 
 bukkit {
     name = 'Menhir'

@@ -43,8 +43,18 @@ public class BlockCoolDown {
         return activate(new Date(System.currentTimeMillis() + TimeUnit.MILLISECONDS.convert(time, TimeUnit.SECONDS)));
     }
 
+    /** Why a cooldown ends. */
+    public enum EndReason {
+        /** The timer ran out. */
+        SCHEDULED,
+        /** A command, the API or a reset ended it early. */
+        MANUAL,
+        /** The block is being unloaded or re-scheduled: no message, no event. */
+        SILENT
+    }
+
     public ActiveCoolDown activate(Date end) {
-        deactivate();
+        deactivate(EndReason.SILENT);
         long remaining = end.getTime() - System.currentTimeMillis();
         if (remaining <= 0) return null;
         block.getType().setOverride(typeOverride);
@@ -52,20 +62,32 @@ public class BlockCoolDown {
         this.active = new ActiveCoolDown(
                 end,
                 future,
-                Bukkit.getScheduler().runTaskLater(block.getPlugin(), this::deactivate, TimeUnit.SECONDS.convert(remaining, TimeUnit.MILLISECONDS) * 20L),
+                Bukkit.getScheduler().runTaskLater(block.getPlugin(), () -> deactivate(EndReason.SCHEDULED), TimeUnit.SECONDS.convert(remaining, TimeUnit.MILLISECONDS) * 20L),
                 Bukkit.getScheduler().runTaskTimer(block.getPlugin(), () -> block.getHologram().update(), 0, 10)
         );
+        block.getPlugin().getCountdownService().onCooldownStart(block, end.getTime());
+        block.persistState();
         return active;
     }
 
+    /** Ends the cooldown early (command, API, reset); broadcasts the respawn message. */
     public boolean deactivate() {
+        return deactivate(EndReason.MANUAL);
+    }
+
+    public boolean deactivate(EndReason reason) {
         if (!isActive()) return false;
         active.getTask().cancel();
         active.getUpdateTask().cancel();
         active.getFuture().complete(null);
         block.getType().setOverride(null);
-        block.broadcast(respawnMessage);
         this.active = null;
+        block.getPlugin().getCountdownService().onCooldownEnd(block);
+        if (reason != EndReason.SILENT) {
+            block.broadcast(respawnMessage);
+            block.persistState();
+            block.getPlugin().getEvents().respawn(block, reason == EndReason.SCHEDULED);
+        }
         block.getHologram().update();
         return true;
     }

@@ -44,6 +44,13 @@ An existing MineBlocks `config.yml` keeps working without changes.
 * **PlaceholderAPI expansion** `menhir` — health, percent, status, countdown, per-block and global tops,
   the viewer's own hits and rank, next respawn.
 * **Hologram templates** — define the hologram once, reuse it on every stone.
+* **Boss bar** — a live health bar for everyone hitting (or standing near) a stone, colour by health,
+  broken title when it falls; throttled and packet-free while nothing changes.
+* **Respawn countdown** — "respawns in 5 minutes / 1 minute / 10 seconds" chat, title and sound
+  announcements so the respawn is an event, not a surprise at 4 am.
+* **YAML or MySQL storage** — file storage by default; MySQL/MariaDB with batched background writes,
+  reconnects and a `server-id` column so several servers can share one leaderboard.
+* **Developer API** — `MenhirAPI`, `MenhirStone` and cancellable Bukkit events for other plugins.
 * **In-game editor** — `/menhir edit <stone>` opens a GUI for location, type, health, hologram, timeout,
   rewards, tool filters and reset options.
 
@@ -95,7 +102,72 @@ legacy-style example is [`examples/escraft-config.yml`](examples/escraft-config.
 | `block-break-limit` | Minimum milliseconds between two hits of one player (per-block `break-limit` overrides) | `20` |
 | `offline-rewards` | Store rewards for offline players and run them on login | `true` |
 | `hologram.*` | Global hologram defaults, see below | |
+| `bossbar.*` | Boss bar shown while hitting, see below | |
+| `respawn-countdown.*` | Announcements before a respawn, see below | |
 | `afk-integration-enabled`, `hologram-update-interval` | **Legacy** MineBlocks keys — still honoured, a deprecation hint is logged once | |
+
+### Boss bar (`options.bossbar`, `blocks.<id>.bossbar`)
+
+| Key | Description | Default |
+|---|---|---|
+| `enabled` | Show a boss bar when a stone is hit | `true` |
+| `show-to` | `HITTER` (only the hitting player), `RADIUS` (everyone within `radius`), `WORLD` | `RADIUS` |
+| `radius` | Blocks, for `RADIUS` | `32` |
+| `hide-after` | Seconds after the last hit until the bar disappears | `8` |
+| `update-interval` | Ticks; the bar is re-rendered at most this often, and only when something changed | `5` |
+| `max-bars-per-player` | Bars one player can see at once; the most recently hit stone wins | `1` |
+| `color` | `PINK`, `BLUE`, `RED`, `GREEN`, `YELLOW`, `PURPLE`, `WHITE` — used when no threshold matches | `RED` |
+| `style` | `PROGRESS`, `NOTCHED_6`, `NOTCHED_10`, `NOTCHED_12`, `NOTCHED_20` | `NOTCHED_20` |
+| `color-thresholds` | List of `{above: <percent>, color: <colour>}`; the first entry the health is strictly above wins. `[]` = always `color` | 66 green / 33 yellow / 0 red |
+| `title` | Bar text. Placeholders: `%block_name%`, `%block_id%`, `%health%`, `%max_health%`, `%percent%`, `%player_1%`, `%player_1_breaks%`, `%my_breaks%`, `%my_rank%`, PlaceholderAPI | see config |
+| `broken-title` | Text shown when the stone breaks | see config |
+| `broken-linger` | Seconds the broken title stays; `0` = hide immediately | `3` |
+
+Bars are removed when the player leaves, changes world, or on `/menhir reload`.
+
+### Respawn countdown (`options.respawn-countdown`, `blocks.<id>.respawn-countdown`)
+
+| Key | Description | Default |
+|---|---|---|
+| `enabled` | Announce before a broken stone respawns | `true` |
+| `broadcast-to` | `SERVER`, `WORLD` (the stone's world) or `RADIUS` | `WORLD` |
+| `radius` | Blocks, for `RADIUS` | `100` |
+| `warn-at` | Seconds before the respawn at which to announce (any order) | `[300, 60, 10]` |
+| `title.enabled` | Also show a title | `true` |
+| `title.only-last` | Title only at the smallest threshold | `true` |
+| `title.fade-in`, `title.stay`, `title.fade-out` | Ticks | `10`, `40`, `10` |
+| `sound` | Sound name (`BLOCK_NOTE_BLOCK_PLING`) or key (`minecraft:block.note_block.pling`); empty = none | `BLOCK_NOTE_BLOCK_PLING` |
+
+Texts live in `lang.countdown.{chat,title,subtitle}` with `%time%` (formatted with `lang.timeout.units`),
+`%block_name%` and `%block_id%`. The regular `timeout.respawn` message is still sent at the respawn.
+Thresholds that passed while the server was offline are not announced late, and each threshold is
+announced once per cooldown.
+
+### Storage (`storage`)
+
+| Key | Description | Default |
+|---|---|---|
+| `type` | `YAML` (one `storage/<id>.yml` per stone) or `MYSQL` | `YAML` |
+| `server-id` | Written to every MySQL row; use a different id per server | `survival` |
+| `cross-server-leaderboard` | Merge all servers' rows in `%player_<n>%` / top placeholders (MySQL) | `false` |
+| `flush-interval` | Seconds between background writes (both backends) | `30` |
+| `mysql.host`, `port`, `database`, `username`, `password` | Connection | `127.0.0.1`, `3306`, `menhir` |
+| `mysql.table-prefix` | Prefix of `breaks`, `state` and `meta` tables | `menhir_` |
+| `mysql.use-ssl` | Require TLS | `false` |
+| `mysql.pool-size` | Connections kept open | `6` |
+| `mysql.connection-timeout` | Milliseconds | `5000` |
+| `mysql.reconnect-interval` | Seconds between reconnect attempts while the database is down | `60` |
+
+Hits are counted per round (they reset when the stone breaks), exactly like the in-memory model.
+Legacy `storage/<id>.mb` files from MineBlocks / Menhir 2.0 are imported automatically. Tables are
+created on first start (`CREATE TABLE IF NOT EXISTS`); the JDBC driver shipped with Paper is used, no
+extra library is needed. When the database is unreachable the plugin keeps running from memory, logs
+one error, retries every `reconnect-interval` seconds and stores unsaved changes in
+`storage/mysql-pending.yml` at shutdown.
+
+Switching backends: set `storage.type`, run `/menhir migrate yaml-to-mysql` (or `mysql-to-yaml`), then
+`/menhir reload`. The migration backs the source up to `storage/storage-backup-<timestamp>.yml` and
+skips rows that already exist in the target unless `--overwrite` is given.
 
 ### Hologram settings (`options.hologram`, `hologram-templates.<name>`, `blocks.<id>.hologram`)
 
@@ -159,11 +231,14 @@ blocks:
 |---|---|
 | `location.{world,x,y,z}` | Block position |
 | `type` | Material of the stone (`GOLD_BLOCK`, `DEEPSLATE_BRICKS`, …) |
+| `display-name` | Name used by `%block_name%` (colour codes allowed); defaults to the id |
 | `health` | Hits needed to break it |
 | `permission` | Permission required to hit it (`""` = none) |
 | `break-limit` | Milliseconds between two hits of one player; `-1` = use `options.block-break-limit` |
 | `hologram.*` | See above |
 | `afk.{enabled,seconds,notification-type}` | Per-block AFK override (optional) |
+| `bossbar.*` | Per-block boss bar override (optional, same keys as `options.bossbar`) |
+| `respawn-countdown.*` | Per-block countdown override (optional, same keys as `options.respawn-countdown`) |
 | `timeout.time` | Cooldown after breaking, in seconds (`-1` = none) |
 | `timeout.type` | Material shown during the cooldown (e.g. `BEDROCK`) |
 | `timeout.respawn` | Message broadcast when the stone comes back (string or list) |
@@ -213,6 +288,8 @@ Commands are run by the console. Placeholders inside commands and messages: `%pl
 | Placeholder | Value |
 |---|---|
 | `%health%` / `%max_health%` | Current / maximum health |
+| `%percent%` | Health in percent (0–100) |
+| `%block_name%` / `%block_id%` | Display name / id of the stone |
 | `%type%` | Material name of the stone |
 | `%timeout%` | Formatted remaining cooldown; empty (and the line is hidden) while the stone is alive |
 | `%player_1%` … `%player_10%` | Name of the *n*-th player (or `lang.top.nobody`) |
@@ -254,6 +331,8 @@ Base command: `/menhir` (aliases `/metin`, `/menhirstone`, `/mb`).
 | `/menhir remove <id>` | Delete a stone (console only; in game use the editor) | `menhir.remove` |
 | `/menhir teleport <id>` | Teleport to a stone | `menhir.teleport` |
 | `/menhir reset <id>` | Reset health and counters | `menhir.reset` |
+| `/menhir respawn <id\|all>` | Respawn a broken stone now (or all of them) | `menhir.admin` |
+| `/menhir migrate <yaml-to-mysql\|mysql-to-yaml> [--overwrite]` | Copy stored data between backends | `menhir.admin` |
 | `/menhir sethealth <id> <n>` | Set the current health | `menhir.sethealth` |
 | `/menhir hologram show <id>` | Show the hologram lines with edit links | `menhir.hologram` |
 | `/menhir hologram addline <id> <text>` | Append a line | `menhir.hologram` |
@@ -263,6 +342,90 @@ Base command: `/menhir` (aliases `/metin`, `/menhirstone`, `/mb`).
 | `/menhir wiki` | Link to this page | — |
 
 `menhir.admin` (default: OP) is required for every subcommand and grants all `menhir.*` permissions.
+
+## Developer API
+
+Menhir exposes a small API for other plugins and scripts. The plugin jar contains it; add it as a
+compile-only dependency from GitHub Packages (or drop the jar into a local repository):
+
+```groovy
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/musbabaff/Menhir")
+        credentials {
+            username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+dependencies {
+    compileOnly "com.musbabaff:menhir:2.1.0"
+}
+```
+
+Maven:
+
+```xml
+<dependency>
+    <groupId>com.musbabaff</groupId>
+    <artifactId>menhir</artifactId>
+    <version>2.1.0</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+Declare the dependency in your `plugin.yml` so Menhir loads first:
+
+```yaml
+softdepend: [Menhir]
+```
+
+Listen to an event and call the API:
+
+```java
+import com.musbabaff.menhir.api.MenhirAPI;
+import com.musbabaff.menhir.api.MenhirProvider;
+import com.musbabaff.menhir.api.TopEntry;
+import com.musbabaff.menhir.api.event.MenhirBreakEvent;
+import com.musbabaff.menhir.api.event.MenhirDamageEvent;
+
+public final class MyListener implements Listener {
+
+    @EventHandler
+    public void onDamage(MenhirDamageEvent event) {
+        // Diamond pickaxes hit twice as hard; creative players cannot hit at all.
+        if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
+            event.setCancelled(true);
+        } else if (event.getPlayer().getInventory().getItemInMainHand().getType() == Material.DIAMOND_PICKAXE) {
+            event.setDamage(2);
+        }
+    }
+
+    @EventHandler
+    public void onBreak(MenhirBreakEvent event) {
+        MenhirAPI api = MenhirProvider.get();
+        List<TopEntry> top = api.getTop(event.getStone().getId(), 3);
+        getLogger().info(event.getStone().getDisplayName() + " fell; top 3: " + top);
+        api.getRespawnAt(event.getStone().getId())
+           .ifPresent(at -> getLogger().info("respawns at " + at));
+    }
+}
+```
+
+Alternatively obtain the API from the services manager:
+`Bukkit.getServicesManager().load(MenhirAPI.class)`.
+
+| Event | Cancellable | Fired when |
+|---|---|---|
+| `MenhirDamageEvent` | yes (and `setDamage`) | a player is about to hit a stone |
+| `MenhirAfkBlockedEvent` | yes | a hit is about to be ignored because the player is AFK |
+| `MenhirBreakEvent` | no | a stone reached zero health (before rewards and reset) |
+| `MenhirRewardEvent` | yes (commands mutable) | a reward is about to be given to a player |
+| `MenhirRespawnEvent` | no | a stone came back (`isScheduled()` tells timer vs. command/API) |
+| `MenhirRespawnCountdownEvent` | no | a countdown warning is announced |
+
+Everything under `com.musbabaff.menhir.api` follows semantic versioning; other packages are internal.
+Javadoc: `./gradlew apiJavadoc` → `build/docs/api`.
 
 ## Migrating from MineBlocks
 
@@ -279,7 +442,7 @@ Base command: `/menhir` (aliases `/metin`, `/menhirstone`, `/mb`).
   (`mb.admin` → `menhir.admin`).
 * PlaceholderAPI placeholders changed identifier: `%mb_…%` → `%menhir_…%` (old parameter names still work).
 * Player prefixes come from Vault now: install Vault if you use `%player_<n>_prefix%`.
-* Stone data (`storage/<id>.mb`) has the same format; nothing is lost.
+* Stone data (`storage/<id>.mb`) is imported into `storage/<id>.yml` on first start; nothing is lost.
 * Requires Paper 1.21.4 and Java 21 — Spigot and older versions are not supported.
 
 ## FAQ

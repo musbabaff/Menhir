@@ -10,10 +10,8 @@ package com.musbabaff.menhir;
 
 import com.musbabaff.menhir.block.MenhirBlock;
 import com.musbabaff.menhir.config.blocks.BlocksConfig;
-import lombok.SneakyThrows;
 import org.bukkit.Location;
 
-import java.nio.file.Files;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -31,6 +29,7 @@ public class BlockRegistry {
         config.removeBlock(mineBlock.getId());
         mineBlock.hide();
         blockMap.remove(mineBlock.getId(), mineBlock);
+        mineBlock.getPlugin().getStorage().renameBlock(mineBlock.getId(), id);
         mineBlock.setId(id);
         blockMap.put(mineBlock.getId(), mineBlock);
         mineBlock.show();
@@ -66,13 +65,12 @@ public class BlockRegistry {
         return blocks;
     }
 
-    @SneakyThrows
     public void delete(MenhirBlock block) {
         MenhirPlugin plugin = block.getPlugin();
         plugin.getConfiguration().getBlocksConfig().removeBlock(block.getId());
         plugin.saveConfiguration();
-        Files.deleteIfExists(MenhirBlock.getStoragePath(plugin, block).toPath());
         unregister(block);
+        plugin.getStorage().deleteBlock(block.getId());
     }
 
     public MenhirBlock get(String id) {

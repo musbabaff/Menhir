@@ -22,6 +22,10 @@ import com.musbabaff.menhir.block.tool.RequiredTool;
 import com.musbabaff.menhir.block.tool.Result;
 import com.musbabaff.menhir.block.type.BlockType;
 import com.musbabaff.menhir.config.blocks.BlocksConfig;
+import com.musbabaff.menhir.config.storage.StorageSettings;
+import com.musbabaff.menhir.storage.StorageFactory;
+import com.musbabaff.menhir.storage.StorageMigration;
+import com.musbabaff.menhir.storage.StorageProvider;
 import com.musbabaff.menhir.menu.edit.EditMenu;
 import com.musbabaff.menhir.util.color.Colors;
 import de.themoep.minedown.adventure.MineDown;
@@ -40,6 +44,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -81,6 +86,7 @@ public class MenhirCommand extends BaseCommand {
     }
 
     private final MenhirPlugin plugin;
+    private volatile boolean migrationRunning;
 
     public MenhirCommand(MenhirPlugin plugin) {
         this.plugin = plugin;
@@ -106,6 +112,8 @@ public class MenhirCommand extends BaseCommand {
                 baseCommand + "hologram setline <block> <line number> <line content> &7Sets line to hologram",
                 baseCommand + "list &7Shows all Menhir blocks on server",
                 baseCommand + "reset <block> &7Resets specified block's health",
+                baseCommand + "respawn <block|all> &7Respawns a broken block immediately",
+                baseCommand + "migrate <yaml-to-mysql|mysql-to-yaml> [--overwrite] &7Copies stored data between storage types",
                 baseCommand + "teleport <block> &7Teleports you to specified block"
                 );
     }
@@ -182,6 +190,94 @@ public class MenhirCommand extends BaseCommand {
         ));
     }
 
+    @Subcommand("respawn")
+    @Syntax("/menhir respawn <block|all>")
+    @CommandCompletion("@blocks|all")
+    public void respawn(CommandSender sender, @Single String name) {
+        if (name.equalsIgnoreCase("all")) {
+            int count = 0;
+            for (MenhirBlock block : plugin.getBlockRegistry().getBlocks()) {
+                if (block.getCoolDown().deactivate()) count++;
+            }
+            Colors.send(sender, "#2C74B3" + count + " block(s) respawned!");
+            return;
+        }
+        Optional.ofNullable(plugin.getBlockRegistry().get(name)).ifPresentOrElse(block -> {
+            if (block.getCoolDown().deactivate()) {
+                Colors.send(sender, "#2C74B3Block " + name + " was respawned!");
+            } else {
+                Colors.send(sender, "#DF2E38Block " + name + " is not broken right now.");
+            }
+        }, () -> Colors.send(sender, "#DF2E38Block with name " + name + " was not found!"));
+    }
+
+    @Subcommand("migrate")
+    @Syntax("/menhir migrate <yaml-to-mysql|mysql-to-yaml> [--overwrite]")
+    @CommandCompletion("yaml-to-mysql|mysql-to-yaml --overwrite")
+    public void migrate(CommandSender sender, String direction, @co.aikar.commands.annotation.Optional String flag) {
+        StorageSettings.Type from;
+        StorageSettings.Type to;
+        switch (direction.toLowerCase(Locale.ROOT)) {
+            case "yaml-to-mysql" -> { from = StorageSettings.Type.YAML; to = StorageSettings.Type.MYSQL; }
+            case "mysql-to-yaml" -> { from = StorageSettings.Type.MYSQL; to = StorageSettings.Type.YAML; }
+            default -> {
+                Colors.send(sender, "#DF2E38Use yaml-to-mysql or mysql-to-yaml.");
+                return;
+            }
+        }
+        boolean overwrite = flag != null && flag.equalsIgnoreCase("--overwrite");
+        if (flag != null && !overwrite) {
+            Colors.send(sender, "#DF2E38Unknown flag " + flag + " (only --overwrite is supported).");
+            return;
+        }
+        if (migrationRunning) {
+            Colors.send(sender, "#DF2E38A migration is already running.");
+            return;
+        }
+        migrationRunning = true;
+        StorageSettings settings = plugin.getConfiguration().getStorageSettings();
+        StorageProvider active = plugin.getStorage();
+        boolean sourceIsActive = settings.getType() == from;
+        boolean targetIsActive = settings.getType() == to;
+        Colors.send(sender, "#2C74B3Migrating " + from + " -> " + to + (overwrite ? " (overwriting existing rows)" : " (existing rows are skipped)") + "...");
+        java.util.function.Consumer<String> progress = line ->
+                plugin.getServer().getScheduler().runTask(plugin, () -> Colors.send(sender, "&7" + line));
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            StorageProvider source = null;
+            StorageProvider target = null;
+            try {
+                source = sourceIsActive ? active : StorageFactory.create(from, settings, plugin.getStorageFolder(), plugin.getLogger());
+                if (!sourceIsActive) source.load().join();
+                target = StorageFactory.create(to, settings, plugin.getStorageFolder(), plugin.getLogger());
+                target.load().join();
+                StorageMigration.Result result = StorageMigration.migrate(source, target, plugin.getStorageFolder(), overwrite, progress);
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    Colors.send(sender, "#2C74B3Migration finished: " + result.blocksCopied() + " block(s), "
+                            + result.playersCopied() + " player row(s) copied, " + result.skipped() + " skipped. Backup: " + result.backup().getName());
+                    if (targetIsActive) {
+                        Colors.send(sender, "&7The active storage was the target; reloading to pick up the migrated data.");
+                        plugin.reload();
+                    } else {
+                        Colors.send(sender, "&7Set storage.type to " + to + " in config.yml and run /menhir reload to switch.");
+                    }
+                });
+            } catch (Exception e) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE, "Storage migration failed", e);
+                plugin.getServer().getScheduler().runTask(plugin, () -> Colors.send(sender, "#DF2E38Migration failed: " + e.getMessage() + " (see console)"));
+                if (target != null) {
+                    try {
+                        target.close();
+                    } catch (Exception ignored) {
+                        // already reported
+                    }
+                }
+            } finally {
+                if (source != null && !sourceIsActive) source.close();
+                migrationRunning = false;
+            }
+        });
+    }
+
     @Subcommand("sethealth")
     @Syntax("/menhir sethealth <block> <health>")
     @CommandPermission("menhir.sethealth")
@@ -190,6 +286,7 @@ public class MenhirCommand extends BaseCommand {
         Optional.ofNullable(plugin.getBlockRegistry().get(name)).ifPresentOrElse(block -> {
             BlockHealth blockHealth = block.getHealth();
             blockHealth.setHealth(Math.max(1, Math.min(health, blockHealth.getMaxHealth())));
+            block.persistState();
             Colors.send(sender,
                     "#2C74B3Health of block "+ name +" was set to "+ blockHealth.getHealth() +"!"
             );
@@ -222,12 +319,6 @@ public class MenhirCommand extends BaseCommand {
                 .ifPresentOrElse(
                         block -> {
                             block.getPlugin().getBlockRegistry().delete(block);
-                            File dataFile = MenhirBlock.getStoragePath(block.getPlugin(), block);
-                            try {
-                                Files.deleteIfExists(dataFile.toPath());
-                            } catch (IOException e) {
-                                block.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "Could not delete data file of block " + block.getId(), e);
-                            }
                             Colors.send(sender, "&7[Menhir] #2C74B3Block " + block.getId() + " was successfully deleted!");
                         },
                         () -> Colors.send(sender, "&7[Menhir] #DF2E38Block with name "+ name +" was not found!")

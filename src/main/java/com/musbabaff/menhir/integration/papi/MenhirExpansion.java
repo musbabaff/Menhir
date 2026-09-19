@@ -9,6 +9,7 @@
 package com.musbabaff.menhir.integration.papi;
 
 import com.musbabaff.menhir.MenhirPlugin;
+import com.musbabaff.menhir.api.TopEntry;
 import com.musbabaff.menhir.block.MenhirBlock;
 import com.musbabaff.menhir.block.cooldown.BlockCoolDown;
 import com.musbabaff.menhir.block.playerdata.PlayerData;
@@ -19,13 +20,9 @@ import org.bukkit.OfflinePlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -134,12 +131,16 @@ public class MenhirExpansion extends PlaceholderExpansion {
             breaks = false;
             position = rest;
         }
-        Optional<PlayerData> data = NumberUtil.parseInt(position)
+        Optional<TopEntry> data = NumberUtil.parseInt(position)
                 .map(i -> i - 1)
-                .flatMap(p -> block.getTop().getPlayer(p));
+                .filter(i -> i >= 0)
+                .flatMap(p -> {
+                    List<TopEntry> leaderboard = block.getLeaderboard(p + 1);
+                    return p < leaderboard.size() ? Optional.of(leaderboard.get(p)) : Optional.empty();
+                });
         return breaks
-                ? data.map(PlayerData::getBreaks).map(String::valueOf).orElse(lang.getNobodyBreaks())
-                : data.map(PlayerData::getDisplayName).orElse(lang.getNobodyName());
+                ? data.map(TopEntry::breaks).map(String::valueOf).orElse(lang.getNobodyBreaks())
+                : data.map(TopEntry::name).orElse(lang.getNobodyName());
     }
 
     private String percent(MenhirBlock block) {
@@ -170,30 +171,16 @@ public class MenhirExpansion extends PlaceholderExpansion {
         boolean breaks = rest.endsWith("_breaks");
         String position = breaks ? rest.substring(0, rest.length() - "_breaks".length())
                 : rest.endsWith("_name") ? rest.substring(0, rest.length() - "_name".length()) : rest;
-        Optional<PlayerData> data = NumberUtil.parseInt(position)
+        Optional<TopEntry> data = NumberUtil.parseInt(position)
                 .map(i -> i - 1)
                 .filter(i -> i >= 0)
                 .flatMap(i -> {
-                    List<PlayerData> total = globalTotals();
+                    List<TopEntry> total = plugin.getStorage().getGlobalTop(i + 1);
                     return i < total.size() ? Optional.of(total.get(i)) : Optional.empty();
                 });
         return breaks
-                ? data.map(PlayerData::getBreaks).map(String::valueOf).orElse(lang.getNobodyBreaks())
-                : data.map(PlayerData::getDisplayName).orElse(lang.getNobodyName());
-    }
-
-    private List<PlayerData> globalTotals() {
-        Map<UUID, PlayerData> totals = new HashMap<>();
-        for (MenhirBlock block : plugin.getBlockRegistry().getBlocks()) {
-            for (PlayerData data : block.getPlayerDataMap().values()) {
-                totals.merge(data.getUuid(),
-                        new PlayerData(data.getUuid(), data.getDisplayName(), data.getBreaks()),
-                        (a, b) -> new PlayerData(a.getUuid(), a.getDisplayName(), a.getBreaks() + b.getBreaks()));
-            }
-        }
-        List<PlayerData> sorted = new ArrayList<>(totals.values());
-        sorted.sort(Comparator.comparingInt(PlayerData::getBreaks).reversed());
-        return sorted;
+                ? data.map(TopEntry::breaks).map(String::valueOf).orElse(lang.getNobodyBreaks())
+                : data.map(TopEntry::name).orElse(lang.getNobodyName());
     }
 
     /** Formatted time until the nearest respawn, or an empty string if no block is broken. */

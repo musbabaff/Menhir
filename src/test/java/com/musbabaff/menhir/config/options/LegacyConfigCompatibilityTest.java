@@ -111,6 +111,24 @@ class LegacyConfigCompatibilityTest {
     }
 
     @Test
+    @DisplayName("the 2.1.0 sections of the example parse with per-block overrides")
+    void newSections() {
+        YamlConfiguration config = example();
+        OptionsConfig options = new OptionsConfig(config.getConfigurationSection("options"), LOGGER);
+        assertEquals(com.musbabaff.menhir.config.bossbar.BossBarSettings.ShowTo.RADIUS, options.getBossBarSettings().getShowTo());
+        com.musbabaff.menhir.config.bossbar.BossBarSettings metin2 = options.getBossBarSettings()
+                .merge(com.musbabaff.menhir.config.bossbar.BossBarSettings.parse(config.getConfigurationSection("blocks.metin_2.bossbar")));
+        assertEquals(com.musbabaff.menhir.config.bossbar.BossBarSettings.ShowTo.HITTER, metin2.getShowTo());
+        assertEquals(5, metin2.getHideAfter());
+        com.musbabaff.menhir.config.countdown.CountdownSettings metin1 = options.getCountdownSettings()
+                .merge(com.musbabaff.menhir.config.countdown.CountdownSettings.parse(config.getConfigurationSection("blocks.metin_1.respawn-countdown")));
+        assertEquals(List.of(600, 300, 60, 10), metin1.getWarnAt());
+        assertEquals(com.musbabaff.menhir.config.countdown.CountdownSettings.BroadcastTo.SERVER, metin1.getBroadcastTo());
+        assertEquals("survival", new com.musbabaff.menhir.config.storage.StorageSettings(config.getConfigurationSection("storage")).getServerId());
+        assertEquals("&6Kuzey Metin Taşı", config.getString("blocks.metin_1.display-name"));
+    }
+
+    @Test
     @DisplayName("lang keys are read")
     void lang() {
         LangConfig lang = new LangConfig(example().getConfigurationSection("lang"));

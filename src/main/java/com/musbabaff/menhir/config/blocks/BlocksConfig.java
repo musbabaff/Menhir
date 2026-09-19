@@ -24,6 +24,8 @@ import com.musbabaff.menhir.block.tool.material.MaterialFilter;
 import com.musbabaff.menhir.block.tool.name.NameFilter;
 import com.musbabaff.menhir.block.type.BlockType;
 import com.musbabaff.menhir.config.afk.AfkSettings;
+import com.musbabaff.menhir.config.bossbar.BossBarSettings;
+import com.musbabaff.menhir.config.countdown.CountdownSettings;
 import com.musbabaff.menhir.config.hologram.HologramSettings;
 import com.musbabaff.menhir.config.hologram.HologramTemplates;
 import com.musbabaff.menhir.config.options.OptionsConfig;
@@ -74,6 +76,9 @@ public class BlocksConfig {
                 block.setLocation(getLocation(block, Objects.requireNonNull(blockSection.getConfigurationSection("location"), "Block " + id + " does not have a location set")));
                 block.setHologram(getHologram(block, blockSection.getConfigurationSection("hologram")));
                 block.setAfkOverride(AfkSettings.parse(blockSection.getConfigurationSection("afk")));
+                block.setBossBarOverride(BossBarSettings.parse(blockSection.getConfigurationSection("bossbar")));
+                block.setCountdownOverride(CountdownSettings.parse(blockSection.getConfigurationSection("respawn-countdown")));
+                block.setDisplayName(blockSection.getString("display-name"));
 
                 ConfigurationSection coolDownSection = blockSection.getConfigurationSection("timeout");
                 if (coolDownSection != null) {
@@ -106,8 +111,6 @@ public class BlocksConfig {
                 if (rewardsSection != null) {
                     block.setRewards(getRewards(block, rewardsSection));
                 } else block.setRewards(new BlockRewards(block, new LinkedList<>(), new LinkedList<>()));
-
-                block.loadData(MenhirBlock.getStoragePath(plugin, block));
 
                 blocks.add(block);
             } catch (Exception e) {
@@ -417,8 +420,12 @@ public class BlocksConfig {
         setRequiredTool(blockSection.createSection("tool"), block.getRequiredTool());
         setRewards(blockSection.createSection("rewards"), block.getRewards());
         setAfk(blockSection.createSection("afk"), block.getAfkOverride());
+        if (block.getBossBarOverride() != null) block.getBossBarOverride().write(blockSection.createSection("bossbar"));
+        if (block.getCountdownOverride() != null) block.getCountdownOverride().write(blockSection.createSection("respawn-countdown"));
+        if (block.getDisplayName() != null && !block.getDisplayName().equals(block.getId()))
+            blockSection.set("display-name", block.getDisplayName());
 
-        for (String s : List.of("timeout", "reset", "messages", "tool", "rewards", "afk")) {
+        for (String s : List.of("timeout", "reset", "messages", "tool", "rewards", "afk", "bossbar", "respawn-countdown")) {
             ConfigurationSection sec = blockSection.getConfigurationSection(s);
             if (sec == null || sec.getKeys(false).isEmpty()) blockSection.set(s, null);
         }

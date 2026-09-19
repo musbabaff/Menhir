@@ -37,7 +37,17 @@ public class BlockHealth {
     }
 
     public void decrement() {
-        health--;
+        damage(1);
+    }
+
+    /** Removes {@code amount} health, never going below zero. */
+    public void damage(int amount) {
+        health = Math.max(0, health - Math.max(0, amount));
+    }
+
+    /** Health as a whole percentage of the maximum (0-100). */
+    public int getPercent() {
+        return (int) Math.round(Math.max(0, health) * 100d / Math.max(1, maxHealth));
     }
 
     public void setMaxHealth(int maxHealth) {

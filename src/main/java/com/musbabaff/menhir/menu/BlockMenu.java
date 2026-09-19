@@ -73,12 +73,9 @@ public abstract class BlockMenu<T extends GuiFiller<T>> extends Gui<T> {
         save();
     }
 
-    @SneakyThrows
     public void remove() {
         MenhirBlock block = getBlock();
         block.getPlugin().getBlockRegistry().delete(block);
-        File dataFile = MenhirBlock.getStoragePath(block.getPlugin(), block);
-        Files.deleteIfExists(dataFile.toPath());
         for (Player viewer : getViewers()) {
             Colors.send(viewer, "#2C74B3Block " + block.getId() + " was successfully deleted!");
             viewer.closeInventory();

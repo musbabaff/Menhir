@@ -60,8 +60,15 @@ public class BlockRewards {
             OfflinePlayer offlinePlayer = block.getPlugin().getServer().getOfflinePlayer(player.getUuid());
             for (Reward lastReward : lastRewards) {
                 if (lastReward.canGet(player, context)) {
+                    List<String> commands = new LinkedList<>();
                     for (String rewardCmd : lastReward.getCommands().rewardPlayer(player, context)) {
-                        String cmd = parsePlaceholders(offlinePlayer, player, rewardCmd);
+                        commands.add(parsePlaceholders(offlinePlayer, player, rewardCmd));
+                    }
+                    List<String> approved = block.getPlugin().getEvents()
+                            .reward(block, offlinePlayer, context.getPosition(player.getUuid()), lastReward.getName(), commands)
+                            .orElse(null);
+                    if (approved == null) continue;
+                    for (String cmd : approved) {
                         if (offlineRewards && !player.isOnline()) {
                             try {
                                 offlineStorage.addCommand(player.getUuid(), cmd);
@@ -88,11 +95,14 @@ public class BlockRewards {
         List<Runnable> toExecute = new LinkedList<>();
         for (Reward reward : rewards) {
             if (reward.canGet(player, context)) {
+                List<String> commands = new LinkedList<>();
                 for (String rewardCmd : reward.getCommands().rewardPlayer(player, context)) {
-                    toExecute.add(() -> dispatchCommand(parsePlaceholders(
-                            offlinePlayer, player, rewardCmd
-                    )));
+                    commands.add(parsePlaceholders(offlinePlayer, player, rewardCmd));
                 }
+                block.getPlugin().getEvents().reward(block, offlinePlayer, -1, reward.getName(), commands)
+                        .ifPresent(approved -> {
+                            for (String cmd : approved) toExecute.add(() -> dispatchCommand(cmd));
+                        });
             }
         }
         return () -> toExecute.forEach(Runnable::run);
