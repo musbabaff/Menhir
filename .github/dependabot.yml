@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Gradle plugins and libraries (shadow, plugin-yml, PlaceholderAPI, Vault, Lombok, ACF, MineDown)
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # The Paper API version defines the minimum supported Minecraft version;
+      # bump it deliberately, not automatically.
+      - dependency-name: "io.papermc.paper:paper-api"
+
+  # Actions used in .github/workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns: ["*"]
